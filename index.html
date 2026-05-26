@@ -345,8 +345,8 @@
             </div>
 
             <div id="camera-container" style="display: none;">
-                <div style="position: relative; background: var(--card); border: 2px solid var(--border); overflow: hidden; margin-bottom: 1rem;">
-                    <video id="camera-video" style="width: 100%; height: auto; display: block;"></video>
+                <div style="position: relative; background: var(--card); border: 2px solid var(--border); overflow: hidden; margin-bottom: 1rem; aspect-ratio: 16/9; background: #000;">
+                    <video id="camera-video" style="width: 100%; height: 100%; object-fit: cover; display: block; background: #000;" autoplay playsinline muted></video>
                     <div id="camera-focus" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; height: 60%; border: 2px dashed var(--accent); pointer-events: none;"></div>
                 </div>
                 <canvas id="camera-canvas" style="display: none;"></canvas>
@@ -626,23 +626,50 @@
                 const scanBtn = document.getElementById('scan-btn');
 
                 if (!cameraStream) {
-                    cameraStream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'environment' }
-                    });
+                    showCameraError('Solicitando acceso a cámara...');
+                    
+                    try {
+                        cameraStream = await navigator.mediaDevices.getUserMedia({
+                            video: { 
+                                facingMode: 'environment',
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 }
+                            }
+                        });
+                    } catch (err) {
+                        console.error('getUserMedia error:', err);
+                        showCameraError(`Error: ${err.name} - ${err.message}`);
+                        return;
+                    }
+
                     video.srcObject = cameraStream;
+                    video.setAttribute('autoplay', 'true');
+                    video.setAttribute('playsinline', 'true');
+                    
+                    // Esperar a que el video esté listo
+                    await new Promise(resolve => {
+                        video.onloadedmetadata = () => {
+                            video.play().catch(e => console.error('Play error:', e));
+                            resolve();
+                        };
+                    });
+
                     container.style.display = 'block';
                     btn.textContent = 'CERRAR CÁMARA';
                     scanBtn.style.display = 'block';
                     clearOCRResult();
+                    showCameraError('');
                 } else {
                     cameraStream.getTracks().forEach(track => track.stop());
                     cameraStream = null;
                     container.style.display = 'none';
                     btn.textContent = 'ABRIR CÁMARA';
                     scanBtn.style.display = 'none';
+                    clearOCRResult();
                 }
             } catch (err) {
-                showCameraError('Permiso de cámara denegado o dispositivo no soportado');
+                console.error('Camera error:', err);
+                showCameraError(`Error: ${err.message || 'Permiso de cámara denegado'}`);
             }
         }
 
